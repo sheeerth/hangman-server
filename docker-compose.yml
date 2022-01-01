@@ -1,0 +1,22 @@
+version: '3.4'
+services:
+  server:
+    build:
+      context: '.'
+      target: server
+    ports:
+      - "3005:3005"
+    volumes:
+      - .:/app
+  redis:
+    image: "redis:alpine"
+    command: redis-server
+    ports:
+      - "6379:6000"
+    volumes:
+      - redis-data:/data
+      - redis-conf:/usr/local/etc/redis/redis.conf
+
+volumes:
+  redis-data:
+  redis-conf:
