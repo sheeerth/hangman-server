@@ -15,10 +15,17 @@ const cors = require("cors");
 const wordsBase = [];
 
 const httpServer = createServer(app);
-const io = new Server(httpServer, { /* options */ });
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
 app.use(logger('dev'));
-app.use(cors())
+app.use(cors({
+  origin: '*'
+}))
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -88,6 +95,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", async (room) => {
+    const roomService = new RoomService();
+
+    const deleteUser = await roomService.userDisconnect(socket.room, socket.id);
+
+    io.in(socket.room).emit('user_out', deleteUser.username);
     io.socketsLeave(room);
   });
 
@@ -100,9 +112,9 @@ io.on("connection", (socket) => {
 
     const users = await roomService.getRoomUsers(room);
     const userName = animals[Math.floor(Math.random() * animals.length)];
-    await roomService.addUserToRoom(room, userName);
+    await roomService.addUserToRoom(room, userName, socket.id);
 
-    socket.emit('users', users);
+    socket.emit('users', users.map((user) => user.username));
     io.in(socket.room).emit('user_join', userName);
   });
 
@@ -123,7 +135,7 @@ io.on("connection", (socket) => {
     io.in(socket.room).emit('letter', letter);
   });
 
-  socket.on('set_mistake', async () => {
+  socket.on('set_mistake', async (letter) => {
     const roomService = new RoomService();
 
     const mistakes = await roomService.addMistake(socket.room);
@@ -137,7 +149,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    io.in(socket.room).emit('mistake');
+    io.in(socket.room).emit('mistake', letter);
   });
 
   socket.on('win_game', async () => {

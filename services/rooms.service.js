@@ -94,6 +94,8 @@ RoomService.prototype.addLetter = async function (letter, roomID) {
     const roomData = JSON.parse(await getRedisValue(roomID));
     const room = new RoomWithGame(roomData.id, roomData.users, roomData.word, roomData.mask, roomData.mistakes);
 
+    console.log(letter);
+
     room.addLetter(letter);
 
     setRedisValue(roomID, JSON.stringify(room.toJSON()));
@@ -121,9 +123,9 @@ RoomService.prototype.resetGame = async function (roomID) {
     return true;
 }
 
-RoomService.prototype.addUserToRoom = async function (roomID, username) {
+RoomService.prototype.addUserToRoom = async function (roomID, username, socketID) {
     const roomData = JSON.parse(await getRedisValue(roomID));
-    const room = new RoomWithoutGame(roomData.id, [...roomData.users, username]);
+    const room = new RoomWithoutGame(roomData.id, [...roomData.users, {username, userID: socketID}]);
 
     setRedisValue(roomID, JSON.stringify(room.toJSON()));
 
@@ -135,6 +137,28 @@ RoomService.prototype.getRoomUsers = async function (roomID) {
     const room = new RoomWithoutGame(roomData.id, roomData.users);
 
     return room.users ? room.users : [];
+}
+
+RoomService.prototype.userDisconnect = async function (roomID, socketID) {
+    const roomData = JSON.parse(await getRedisValue(roomID));
+    let room = null;
+
+    if (roomData.isPlaying) {
+       room = new RoomWithGame(roomData.id, roomData.users, roomData.word, roomData.mask, roomData.mistakes);
+    } else {
+        room = new RoomWithoutGame(roomData.id, roomData.users);
+    }
+
+    const userIndex = room.users.findIndex(user => user.userID === socketID);
+    const deleteUser = {...room.users[userIndex]};
+    const copyUserArray = [...room.users];
+
+    copyUserArray.splice(userIndex, 1);
+    room.users = [...copyUserArray]
+
+    setRedisValue(roomID, JSON.stringify(room.toJSON()));
+
+    return deleteUser;
 }
 
 module.exports = {
